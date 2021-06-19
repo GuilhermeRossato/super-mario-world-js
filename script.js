@@ -82,14 +82,14 @@ class Chunk {
 const data = new Uint32Array(32 * 32);
 const chunk = new Chunk(0, 0, data);
 for (let x = 0; x < 32; x++) {
-	chunk.set(x, 63, 1);
+	chunk.set(x, 31, 1);
 }
 
 window.onload = function(){
 	const app = new PIXI.Application({
 		width: window.innerWidth,
 		height: window.innerHeight,
-		backgroundColor: 0x1099bb,
+		backgroundColor: 0x1099BB,
 		resolution: window.devicePixelRatio || 1,
 		resizeTo: window
 	});
