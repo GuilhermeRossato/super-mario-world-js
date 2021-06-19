@@ -1,5 +1,5 @@
-import PIXI from "./pixi.js";
-import BlockData from "./data/blockData.js";
+import PIXI from "./lib/pixi.js";
+import BlockData from "./data/BlockData.js";
 
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
 
