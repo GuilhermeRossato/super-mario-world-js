@@ -8,7 +8,7 @@ It's quite a challenge so I might not even finish it, who knows.
 
 # Demo
 
-Coming soon.
+https://grossato.com/super-mario-world-js/
 
 # Tech stack
 

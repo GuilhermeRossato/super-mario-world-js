@@ -45,11 +45,11 @@ class Chunk {
 				if (!BlockData[id]) {
 					continue;
 				}
-				const texture = BlockData[id].texture;
-				if (!texture) {
+				const textureName = BlockData[id].texture;
+				if (!textureName) {
 					continue;
 				}
-				const texture = SpriteTextureService.get(texture);
+				const texture = SpriteTextureService.get(textureName);
 				const sprite = new PIXI.Sprite(texture);
 				this.container.addChild(sprite);
 			}
