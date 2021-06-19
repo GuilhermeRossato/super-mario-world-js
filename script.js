@@ -1,6 +1,25 @@
 import PIXI from "./pixi.js";
+import BlockData from "./data/blockData.js";
 
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
+
+const spriteTextureCache = {};
+
+class SpriteTextureService {
+	constructor() {
+	}
+
+	/**
+	 * @param {string} texture
+	 * @returns {PIXI.Texture}
+	 */
+	static get(texture) {
+		if (!spriteTextureCache[texture]) {
+			spriteTextureCache[texture] = PIXI.Texture.from("./assets/" + texture);
+		}
+		return spriteTextureCache[texture];
+	}
+}
 
 class Chunk {
 	/**
@@ -13,31 +32,54 @@ class Chunk {
 		this.cx = cx;
 		this.cy = cy;
 		if (!data) {
-			data = new Uint32Array(64 * 64);
+			data = new Uint32Array(32 * 32);
 		}
-		if (data.length !== 64 * 64) {
+		if (data.length !== 32 * 32) {
 			throw new Error("Unexpected size");
 		}
 		this.data = data;
 		this.container = new PIXI.Container();
+		for (let y = 0; y < 32; y++) {
+			for (let x = 0; x < 32; x++) {
+				let id = data[y * 32 + x];
+				if (!BlockData[id]) {
+					continue;
+				}
+				const texture = BlockData[id].texture;
+				if (!texture) {
+					continue;
+				}
+				const texture = SpriteTextureService.get(texture);
+				const sprite = new PIXI.Sprite(texture);
+				this.container.addChild(sprite);
+			}
+		}
+	}
+
+	assignToStage(stage) {
+		if (this.assigned) {
+			throw new Error("Already assigned");
+		}
+		this.assigned = true;
+		stage.addChild(this.container);
 	}
 
 	get(x, y) {
-		if (x < 0 || x >= 64 || y < 0 || y >= 64) {
-			throw new Error(`Coords (${x}, ${y}) out of bounds (64, 64)`);
+		if (x < 0 || x >= 32 || y < 0 || y >= 32) {
+			throw new Error(`Coords (${x}, ${y}) out of bounds (32, 32)`);
 		}
-		return this.data[y * 64 + x];
+		return this.data[y * 32 + x];
 	}
 
 	set(x, y, v) {
-		if (x < 0 || x >= 64 || y < 0 || y >= 64) {
-			throw new Error(`Coords (${x}, ${y}) out of bounds (64, 64)`);
+		if (x < 0 || x >= 32 || y < 0 || y >= 32) {
+			throw new Error(`Coords (${x}, ${y}) out of bounds (32, 32)`);
 		}
-		return (this.data[y * 64 + x] = v);
+		return (this.data[y * 32 + x] = v);
 	}
 }
 
-const data = new Uint32Array(64 * 64);
+const data = new Uint32Array(32 * 32);
 const chunk = new Chunk(0, 0, data);
 for (let x = 0; x < 32; x++) {
 	chunk.set(x, 63, 1);
