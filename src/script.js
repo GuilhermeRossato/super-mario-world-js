@@ -6,9 +6,6 @@ PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
 const spriteTextureCache = {};
 
 class SpriteTextureService {
-	constructor() {
-	}
-
 	/**
 	 * @param {string} texture
 	 * @returns {PIXI.Texture}
@@ -51,6 +48,8 @@ class Chunk {
 				}
 				const texture = SpriteTextureService.get(textureName);
 				const sprite = new PIXI.Sprite(texture);
+				sprite.position.x = x * 16;
+				sprite.position.y = y * 16;
 				this.container.addChild(sprite);
 			}
 		}
@@ -79,11 +78,7 @@ class Chunk {
 	}
 }
 
-const data = new Uint32Array(32 * 32);
-const chunk = new Chunk(0, 0, data);
-for (let x = 0; x < 32; x++) {
-	chunk.set(x, 31, 1);
-}
+// 32 * 32 
 
 window.onload = function(){
 	const app = new PIXI.Application({
@@ -91,8 +86,13 @@ window.onload = function(){
 		height: window.innerHeight,
 		backgroundColor: 0x1099BB,
 		resolution: window.devicePixelRatio || 1,
-		resizeTo: window
 	});
+
+	window.onresize = function() {
+    	// app.resize(window.innerWidth / window.devicePixelRatio, window.innerHeight / window.devicePixelRatio);
+    	app.view.width = app.screen.width = window.innerWidth;
+    	app.view.height = app.screen.height = window.innerHeight;
+    }
 
 	document.body.appendChild(app.view);
 
@@ -100,52 +100,101 @@ window.onload = function(){
 
 	app.stage.addChild(container);
 
-	const textures = [
-		"ground-in.png",
-		"ground-left-left.png",
-		"ground-left.png",
-		"ground-middle.png",
-		"ground-right-right.png",
-		"ground-right.png",
-		"left-bottom-pipe.png",
-		"left-top-pipe.png",
-		"right-bottom-pipe.png",
-		"plant-left.png",
-		"plant-middle.png",
-		"plant-right.png",
-		"right-top-pipe.png",
-		"plant-left.png",
-		"plant-middle.png",
-		"plant-right.png"
-	].map(filename => PIXI.Texture.from("./assets/" + filename));
-
 	const marioTexture = PIXI.Texture.from("./assets/mario-animation-sheet.png");
 	const mario = new PIXI.TilingSprite(marioTexture, 48, 48);
-	mario.position.x = 100;
+	mario.position.x = 0;
+	// mario.scale.x *= -1;
+	app.stage.pivot.x = - app.screen.width / 2;
+	app.stage.pivot.y = - app.screen.height / 2;
 
 	app.stage.addChild(mario);
 
-	// Create a 5x5 grid of bunnies
-	for (let i = 0; i < 250; i++) {
-		const bunny = new PIXI.Sprite(textures[i % textures.length]);
-		bunny.anchor.set(0.5);
-		bunny.x = (i % 5) * 16;
-		bunny.y = Math.floor(i / 5) * 16;
-		container.addChild(bunny);
+	const data = new Uint32Array(32 * 32);
+	for (let x = 0; x < 32; x++) {
+		data[x + 15 * 32] = 1;
 	}
+	data[(0) + (14) * 32] = 3;
+	data[(31) + (14) * 32] = 2;
+	const chunk = new Chunk(0, 0, data);
+	chunk.assignToStage(app.stage);
 
 	// Move container to the center
 	container.x = app.screen.width / 2;
 	container.y = app.screen.height / 2;
 
-	// Center bunny sprite in local container coordinates
-	container.pivot.x = container.width / 2;
-	container.pivot.y = container.height / 2;
+	const keyboard = {
+		left: false,
+		right: false,
+		down: false,
+		up: false,
+		b: false,
+		a: false,
+		y: false,
+		x: false,
+		start: false,
+		select: false,
+		l: false,
+		r: false
+	};
+
+	const keyboardConfig = {
+		ArrowLeft: "left",
+		ArrowRight: "right",
+		ArrowDown: "down",
+		ArrowUp: "up",
+		KeyC: "b",
+		KeyV: "a",
+		KeyX: "y",
+		KeyD: "x",
+		Enter: "start",
+		Escape: "select",
+		KeyA: "l",
+		KeyS: "r"
+	};
+
+	window.addEventListener("keydown", (event) => {
+		if (keyboardConfig[event.code]) {
+			keyboard[keyboardConfig[event.code]] = true;
+		}
+	});
+
+	window.addEventListener("keyup", (event) => {
+		if (keyboardConfig[event.code]) {
+			keyboard[keyboardConfig[event.code]] = false;
+		}
+	});
 
 	let walk_frame = 0;
 
 	// Listen for animate update
-	app.ticker.add((delta, x) => {
+	app.ticker.add((frames, x) => {
+		let moved = false;
+		const col_x = Math.floor((19 + mario.position.x) / 16);
+		const col_y = Math.floor((38 + mario.position.y) / 16);
+
+		const is_within_range = col_x >= 0 && col_x < 31 && col_y >= 0 && col_y <= 31;
+		if (!is_within_range) {
+			mario.position.y += 1;
+			moved = true;
+		} else if (!chunk.get(col_x, col_y)) {
+			mario.position.y += 1;
+			moved = true;
+		}
+
+		if (keyboard.right) {
+			mario.position.x += 1.25 * frames;
+			moved = true;
+		} else if (keyboard.left) {
+			mario.position.x -= 1.25 * frames;
+			moved = true;
+		}
+
+
+		if (moved) {
+			app.stage.pivot.x = - app.screen.width / 2 + mario.position.x;
+			app.stage.pivot.y = - app.screen.height / 2 + mario.position.y;
+		}
+
 		// rotate the container!
 		// use delta to create frame-independent transform
 		// container.rotation -= 0.01 * delta;
@@ -155,8 +204,8 @@ window.onload = function(){
 			mario.tilePosition.x = -8;
 			mario.tilePosition.y = -33;
 		} else {
-			mario.tilePosition.x = -164;
-			mario.tilePosition.y = -33;
+			//mario.tilePosition.x = -164;
+			//mario.tilePosition.y = -33;
 		}
 	});
 }
