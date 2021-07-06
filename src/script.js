@@ -1,211 +1,135 @@
 import PIXI from "./lib/pixi.js";
-import BlockData from "./data/BlockData.js";
+import { changeVerticalVelocity, changeHorizontalVelocity } from "./movement.js";
+import { World } from "./World.js";
 
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
 
-const spriteTextureCache = {};
+window.onload = async function() {
+    const app = new PIXI.Application({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        backgroundColor: 0x1099BB,
+        resolution: 1,
+    });
 
-class SpriteTextureService {
-	/**
-	 * @param {string} texture
-	 * @returns {PIXI.Texture}
-	 */
-	static get(texture) {
-		if (!spriteTextureCache[texture]) {
-			spriteTextureCache[texture] = PIXI.Texture.from("./assets/" + texture);
-		}
-		return spriteTextureCache[texture];
-	}
-}
-
-class Chunk {
-	/**
-	 *
-	 * @param {number} cx
-	 * @param {number} cy
-	 * @param {Uint32Array} data
-	 */
-	constructor(cx, cy, data) {
-		this.cx = cx;
-		this.cy = cy;
-		if (!data) {
-			data = new Uint32Array(32 * 32);
-		}
-		if (data.length !== 32 * 32) {
-			throw new Error("Unexpected size");
-		}
-		this.data = data;
-		this.container = new PIXI.Container();
-		for (let y = 0; y < 32; y++) {
-			for (let x = 0; x < 32; x++) {
-				let id = data[y * 32 + x];
-				if (!BlockData[id]) {
-					continue;
-				}
-				const textureName = BlockData[id].texture;
-				if (!textureName) {
-					continue;
-				}
-				const texture = SpriteTextureService.get(textureName);
-				const sprite = new PIXI.Sprite(texture);
-				sprite.position.x = x * 16;
-				sprite.position.y = y * 16;
-				this.container.addChild(sprite);
-			}
-		}
-	}
-
-	assignToStage(stage) {
-		if (this.assigned) {
-			throw new Error("Already assigned");
-		}
-		this.assigned = true;
-		stage.addChild(this.container);
-	}
-
-	get(x, y) {
-		if (x < 0 || x >= 32 || y < 0 || y >= 32) {
-			throw new Error(`Coords (${x}, ${y}) out of bounds (32, 32)`);
-		}
-		return this.data[y * 32 + x];
-	}
-
-	set(x, y, v) {
-		if (x < 0 || x >= 32 || y < 0 || y >= 32) {
-			throw new Error(`Coords (${x}, ${y}) out of bounds (32, 32)`);
-		}
-		return (this.data[y * 32 + x] = v);
-	}
-}
-
-// 32 * 32 
-
-window.onload = function(){
-	const app = new PIXI.Application({
-		width: window.innerWidth,
-		height: window.innerHeight,
-		backgroundColor: 0x1099BB,
-		resolution: window.devicePixelRatio || 1,
-	});
-
-	window.onresize = function() {
-    	// app.resize(window.innerWidth / window.devicePixelRatio, window.innerHeight / window.devicePixelRatio);
-    	app.view.width = app.screen.width = window.innerWidth;
-    	app.view.height = app.screen.height = window.innerHeight;
+    window.onresize = function() {
+        // app.resize(window.innerWidth / window.devicePixelRatio, window.innerHeight / window.devicePixelRatio);
+        app.view.width = app.screen.width = window.innerWidth;
+        app.view.height = app.screen.height = window.innerHeight;
     }
 
-	document.body.appendChild(app.view);
+    document.body.appendChild(app.view);
 
-	const container = new PIXI.Container();
+    const world = new World();
+    await world.loadChunkFromURL(app.stage, "./world/0_0.json");
+    await world.loadChunkFromURL(app.stage, "./world/1_0.json");
+    await world.loadChunkFromURL(app.stage, "./world/2_0.json");
 
-	app.stage.addChild(container);
+    const marioTexture = await new Promise(resolve => {
+        PIXI.loader.add([
+            "./assets/mario-animation-sheet.png"
+        ]).load(function() {
+            resolve(PIXI.loader.resources["./assets/mario-animation-sheet.png"].texture);
+        })
+    });
 
-	const marioTexture = PIXI.Texture.from("./assets/mario-animation-sheet.png");
-	const mario = new PIXI.TilingSprite(marioTexture, 48, 48);
-	mario.position.x = 0;
-	// mario.scale.x *= -1;
-	app.stage.pivot.x = - app.screen.width / 2;
-	app.stage.pivot.y = - app.screen.height / 2;
+    const mario = new PIXI.TilingSprite(marioTexture, 48, 48);
 
-	app.stage.addChild(mario);
+    const rect = new PIXI.Graphics();
 
-	const data = new Uint32Array(32 * 32);
-	for (let x = 0; x < 32; x++) {
-		data[x + 15 * 32] = 1;
-	}
-	data[(0) + (14) * 32] = 3;
-	data[(31) + (14) * 32] = 2;
-	const chunk = new Chunk(0, 0, data);
-	chunk.assignToStage(app.stage);
+    // rect.beginFill(0xFFFF00);
 
-	// Move container to the center
-	container.x = app.screen.width / 2;
-	container.y = app.screen.height / 2;
+    // set the line style to have a width of 5 and set the color to red
+    rect.lineStyle(1, 0xFF0000);
 
-	const keyboard = {
-		left: false,
-		right: false,
-		down: false,
-		up: false,
-		b: false,
-		a: false,
-		y: false,
-		x: false,
-		start: false,
-		select: false,
-		l: false,
-		r: false
-	};
+    // draw a rectangle
+    rect.drawRect(0, 0, 10, 19);
 
-	const keyboardConfig = {
-		ArrowLeft: "left",
-		ArrowRight: "right",
-		ArrowDown: "down",
-		ArrowUp: "up",
-		KeyC: "b",
-		KeyV: "a",
-		KeyX: "y",
-		KeyD: "x",
-		Enter: "start",
-		Escape: "select",
-		KeyA: "l",
-		KeyS: "r"
-	};
+    app.stage.addChild(mario);
+    app.stage.addChild(rect);
 
-	window.addEventListener("keydown", (event) => {
-		if (keyboardConfig[event.code]) {
-			keyboard[keyboardConfig[event.code]] = true;
-		}
-	});
+    const keyboard = {
+        left: false,
+        right: false,
+        down: false,
+        up: false,
+        jump: false
+    };
 
-	window.addEventListener("keyup", (event) => {
-		if (keyboardConfig[event.code]) {
-			keyboard[keyboardConfig[event.code]] = false;
-		}
-	});
+    const keyboardConfig = {
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        ArrowDown: "down",
+        ArrowUp: "up",
+        KeyA: "left",
+        KeyD: "right",
+        KeyS: "down",
+        KeyW: "up",
+        KeyC: "jump"
+    };
 
-	let walk_frame = 0;
+    window.addEventListener("keydown", (event) => {
+        if (keyboardConfig[event.code]) {
+            keyboard[keyboardConfig[event.code]] = true;
+        }
+    });
 
-	// Listen for animate update
-	app.ticker.add((frames, x) => {
-		let moved = false;
-		const col_x = Math.floor((19 + mario.position.x) / 16);
-		const col_y = Math.floor((38 + mario.position.y) / 16);
+    window.addEventListener("keyup", (event) => {
+        if (keyboardConfig[event.code]) {
+            keyboard[keyboardConfig[event.code]] = false;
+        }
+    });
 
-		const is_within_range = col_x >= 0 && col_x < 31 && col_y >= 0 && col_y <= 31;
-		if (!is_within_range) {
-			mario.position.y += 1;
-			moved = true;
-		} else if (!chunk.get(col_x, col_y)) {
-			mario.position.y += 1;
-			moved = true;
-		}
+    let walk_frame = 0;
+    const horVelocityObj = {velocity: 0, counter: 0};
+    const vertVelocityObj = {velocity: 0, counter: 0};
 
-		if (keyboard.right) {
-			mario.position.x += 1.25 * frames;
-			moved = true;
-		} else if (keyboard.left) {
-			mario.position.x -= 1.25 * frames;
-			moved = true;
-		}
+    let marioPosX = 0;
+    let marioPosY = 0;
 
+    function updateMarioPosition(frames) {
+        const feet_x = Math.floor((19 + marioPosX) / 16);
+        const feet_y = Math.floor((39 + marioPosY) / 16);
 
-		if (moved) {
-			app.stage.pivot.x = - app.screen.width / 2 + mario.position.x;
-			app.stage.pivot.y = - app.screen.height / 2 + mario.position.y;
-		}
+        const grounded = world.get(feet_x, feet_y) !== 0;
 
-		// rotate the container!
-		// use delta to create frame-independent transform
-		// container.rotation -= 0.01 * delta;
+        changeHorizontalVelocity(horVelocityObj, keyboard.left, keyboard.right, keyboard.jump);
+        changeVerticalVelocity(vertVelocityObj, grounded);
 
-		walk_frame = (walk_frame + 1) % 30;
-		if (walk_frame < 10) {
-			mario.tilePosition.x = -8;
-			mario.tilePosition.y = -33;
-		} else {
-			//mario.tilePosition.x = -164;
-			//mario.tilePosition.y = -33;
-		}
-	});
+        marioPosX += horVelocityObj.velocity * frames;
+        marioPosY -= vertVelocityObj.velocity * frames;
+        if (marioPosY > 170) {
+            marioPosY = 170;
+        }
+
+        mario.position.x = Math.floor(marioPosX);
+        mario.position.y = Math.floor(marioPosY);
+
+        rect.position.x = Math.floor(mario.position.x) + 19;
+        rect.position.y = Math.floor(mario.position.y) + 19;
+    }
+
+    let frameCount = 0;
+
+    // Listen for frame update
+    app.ticker.add((frames) => {
+        frameCount ++;
+        /*
+        if (frameCount % 8 !== 3) {
+            return;
+        }*/
+        updateMarioPosition(frames);
+
+        app.stage.pivot.x = + 24 - (app.screen.width) / 2 + marioPosX;
+        app.stage.pivot.y = + 28 - (app.screen.height) / 2 + marioPosY;
+
+        walk_frame = (walk_frame + 1) % 30;
+        if (walk_frame < 10) {
+            mario.tilePosition.x = -8;
+            mario.tilePosition.y = -33;
+        } else {
+            //mario.tilePosition.x = -164;
+            //mario.tilePosition.y = -33;
+        }
+    });
 }

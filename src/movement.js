@@ -1,17 +1,22 @@
 const maxAbsoluteVerticalSpeed = 4.333;
 const gravityAcceleration = -0.3;
 
-export function getVerticalVelocity(grounded, previousVelocity) {
+export function changeVerticalVelocity(verticalVelocityObject, grounded) {
 	if (grounded) {
-		return 0;
+		verticalVelocityObject.velocity = 0;
+		return;
 	}
+	const previousVelocity = verticalVelocityObject.velocity;
 	if (previousVelocity > -1) {
-		return -1;
+		verticalVelocityObject.velocity = -1;
+		return;
 	}
 	if (previousVelocity < -maxAbsoluteVerticalSpeed) {
-		return -maxAbsoluteVerticalSpeed;
+		verticalVelocityObject.velocity = -maxAbsoluteVerticalSpeed;
+		return;
 	}
-	return Math.max(-maxAbsoluteVerticalSpeed, previousVelocity + gravityAcceleration);
+	verticalVelocityObject.velocity = Math.max(-maxAbsoluteVerticalSpeed, previousVelocity + gravityAcceleration);
+	return;
 }
 
 /**
